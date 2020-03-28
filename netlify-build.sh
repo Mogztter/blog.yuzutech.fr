@@ -4,4 +4,4 @@
 npm install ./packages/asciidoc-loader
 npm install ./packages/ui-loader
 
-antora --html-url-extension-style=indexify --pull site.yml --generator ./lib/generator.js
+antora --html-url-extension-style=indexify --pull site-local.yml --generator ./lib/generator.js
