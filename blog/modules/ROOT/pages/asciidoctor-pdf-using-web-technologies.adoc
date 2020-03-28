@@ -1,14 +1,12 @@
 = Awesome Asciidoctor.js: Create PDF using Web technologies
 Guillaume Grossetie <ggrossetie@yuzutech.fr>
-:page-revdate: 2020-03-15 15:00
+:page-revdate: 2020-03-28 15:00
 :page-author: Guillaume Grossetie
 :description: Learn how to create a PDF from an AsciiDoc document using Web technologies!
 :page-tags: Asciidoctor.js, Converter, PDF, JavaScript, CSS, Paged Media
-:page-image:
-:page-color-primary:
-:page-color-secondary:
-
-
+:page-image: print.jpg
+:page-color-primary: #cb8530
+:page-color-secondary: #7f7b78
 
 The first question you might ask is: *does it make sense to use Web technologies for print?* +
 It actually makes a lot of sense!
@@ -51,7 +49,7 @@ Recommended articles by https://twitter.com/rachelandrew[Rachel Andrew] from htt
 So, basically we have everything we need, right?
 Well... currently, very few things are natively supported by browsers 😞
 
-But don't despair, there's hope! 🤞
+But don't despair, there's hope!
 
 == Paged.js to the rescue! ⛑️
 
