@@ -27,6 +27,8 @@
     "@fortawesome/fontawesome-svg-core": "1.2.8",
     "@fortawesome/free-brands-svg-icons": "5.13.0",
     "@fortawesome/free-regular-svg-icons": "5.13.0",
-    "@fortawesome/free-solid-svg-icons": "5.13.0"
+    "@fortawesome/free-solid-svg-icons": "5.13.0",
+    "browser-sync": "^2.26.12",
+    "chokidar": "^3.4.2"
   }
 }

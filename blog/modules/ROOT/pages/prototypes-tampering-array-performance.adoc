@@ -1,0 +1,254 @@
+= Valiant V8: prototypes tampering and Array#splice performance
+Guillaume Grossetie <ggrossetie@yuzutech.fr>
+:page-revdate: 2020-10-04 19:00
+:page-author: Guillaume Grossetie
+:description: TODO
+:page-tags: V8, JavaScript, performance
+//:page-image: come.jpeg
+:page-color-primary: #8BB3B2
+:page-color-secondary: #C68B45
+:source-highlighter: highlight.js
+
+V8 is a high-performance JavaScript engine most notably used in Chrome and in Node.js.
+
+> V8 Torque is a language that allows developers contributing to the V8 project to express changes in the VM by focusing on the intent of their changes to the VM, rather than preoccupying themselves with unrelated implementation details.
+The language was designed to be simple enough to make it easy to directly translate the ECMAScript specification into an implementation in V8, but powerful enough to express the low-level V8 optimization tricks in a robust way, like creating fast-paths based on tests for specific object-shapes.
+
+Torque compiler converts these morsels into efficient assembly code using the CodeStubAssembler
+
+https://v8.dev/blog/elements-kinds#debugging
+
+Torque implementation
+https://github.com/v8/v8/blob/4b9b23521e6fd42373ebbcb20ebe03bf445494f9/src/builtins/array-splice.tq#L125
+
+
+FastJSArray
+
+https://github.com/v8/v8/blob/4b9b23521e6fd42373ebbcb20ebe03bf445494f9/src/builtins/base.tq#L1289-L1303
+
+
+Ben Noordhuis
+
+fast path https://github.com/v8/v8/blob/8ca2a7c83359f41bc990e4a2cf3a0edbc153cca8/src/codegen/code-stub-assembler.cc#L3653 but the code is only sound when
+Array.prototype is unmodified, hence the IsPrototypeInitialArrayPrototype() check.
+
+Older versions of V8 called out to this JS-with-extensions code:
+https://github.com/v8/v8/blob/7.0.1/src/js/array.js#L599-L642 - I
+don't speak for the V8 team but I don't believe they're looking to
+return to that approach.
+
+As mentioned in the
+https://v8.dev/docs/torque
+
+```
+./out/x64.release/d8 --allow-natives-syntax
+V8 version 8.8.0 (candidate)
+d8> Object.setPrototypeOf(Array.prototype, {}); const array = [1,2,3]; %DebugPrint(array);
+DebugPrint: 0x181808088d69: [JSArray]
+ - map: 0x18180824385d <Map(PACKED_SMI_ELEMENTS)> [FastProperties]
+ - prototype: 0x18180820b5e9 <JSArray[0]>
+ - elements: 0x18180821263d <FixedArray[3]> [PACKED_SMI_ELEMENTS (COW)]
+ - length: 3
+ - properties: 0x181808042229 <FixedArray[0]> {
+    0x181808044695: [String] in ReadOnlySpace: #length: 0x181808182159 <AccessorInfo> (const accessor descriptor)
+ }
+ - elements: 0x18180821263d <FixedArray[3]> {
+           0: 1
+           1: 2
+           2: 3
+ }
+0x18180824385d: [Map]
+ - type: JS_ARRAY_TYPE
+ - instance size: 16
+ - inobject properties: 0
+ - elements kind: PACKED_SMI_ELEMENTS
+ - unused property fields: 0
+ - enum length: invalid
+ - back pointer: 0x1818080423b1 <undefined>
+ - prototype_validity cell: 0x181808182445 <Cell value= 1>
+ - instance descriptors #1: 0x18180820ba9d <DescriptorArray[1]>
+ - transitions #1: 0x18180820bab9 <TransitionArray[4]>Transition array #1:
+     0x181808044f85 <Symbol: (elements_transition_symbol)>: (transition to HOLEY_SMI_ELEMENTS) -> 0x1818082438d5 <Map(HOLEY_SMI_ELEMENTS)>
+
+ - prototype: 0x18180820b5e9 <JSArray[0]>
+ - constructor: 0x18180820b385 <JSFunction Array (sfi = 0x18180818b3a5)>
+ - dependent code: 0x1818080421b5 <Other heap object (WEAK_FIXED_ARRAY_TYPE)>
+ - construction counter: 0
+
+[1, 2, 3]
+d8> 
+```
+
+```
+./out/x64.release/d8 --allow-natives-syntax
+V8 version 8.8.0 (candidate)
+d8> const array = [1,2,3]; %DebugPrint(array);
+DebugPrint: 0x1d6708088b21: [JSArray]
+ - map: 0x1d670824385d <Map(PACKED_SMI_ELEMENTS)> [FastProperties]
+ - prototype: 0x1d670820b5e9 <JSArray[0]>
+ - elements: 0x1d670821263d <FixedArray[3]> [PACKED_SMI_ELEMENTS (COW)]
+ - length: 3
+ - properties: 0x1d6708042229 <FixedArray[0]> {
+    0x1d6708044695: [String] in ReadOnlySpace: #length: 0x1d6708182159 <AccessorInfo> (const accessor descriptor)
+ }
+ - elements: 0x1d670821263d <FixedArray[3]> {
+           0: 1
+           1: 2
+           2: 3
+ }
+0x1d670824385d: [Map]
+ - type: JS_ARRAY_TYPE
+ - instance size: 16
+ - inobject properties: 0
+ - elements kind: PACKED_SMI_ELEMENTS
+ - unused property fields: 0
+ - enum length: invalid
+ - back pointer: 0x1d67080423b1 <undefined>
+ - prototype_validity cell: 0x1d6708182445 <Cell value= 1>
+ - instance descriptors #1: 0x1d670820ba9d <DescriptorArray[1]>
+ - transitions #1: 0x1d670820bab9 <TransitionArray[4]>Transition array #1:
+     0x1d6708044f85 <Symbol: (elements_transition_symbol)>: (transition to HOLEY_SMI_ELEMENTS) -> 0x1d67082438d5 <Map(HOLEY_SMI_ELEMENTS)>
+
+ - prototype: 0x1d670820b5e9 <JSArray[0]>
+ - constructor: 0x1d670820b385 <JSFunction Array (sfi = 0x1d670818b3a5)>
+ - dependent code: 0x1d67080421b5 <Other heap object (WEAK_FIXED_ARRAY_TYPE)>
+ - construction counter: 0
+
+[1, 2, 3]
+d8>
+```
+
+== Microbenchmarks
+
+- Performance improvements (Array#splice faster on Node 12/14)
+- Implementation changed and based on Torque (more strict about prototypes tampering)
+
+
+node-v10.22.1 V8 version < 7.0
+node-v14.12.0 V8 version 8.4
+
+== Prototypes tampering
+
+Changing the prototype of an object can be useful in some specific cases.
+In this context, I'm using https://github.com/opal/opal[Opal] which relies on prototypes to augment built-in objects and implement Ruby inheritance model.
+
+In fact, Opal will actually replace the prototype on the `Array` built-in object using `Object.setPrototypeOf`:
+
+```js
+Object.setPrototypeOf(Array.prototype, Opal.Class.prototype)
+```
+
+Once you've done that, V8 won't use fast execution paths on Array functions anymore.
+And, as you might have guessed, the performance of these functions will be poor (such as `shift`, `splice`, `slice`...).
+
+At this point, you are probably thinking: "Just don’t mess with prototypes!".
+And you are right but that's not always possible...
+
+[NOTE]
+====
+If you want to learn more about JavaScript engines and how they optimize code, I highly recommend reading https://twitter.com/mathias[Mathias Bynens] blog posts:
+
+- https://mathiasbynens.be/notes/shapes-ics[Shapes and inline caches]
+- https://mathiasbynens.be/notes/prototypes[Optimizing prototypes]
+
+The main takeaway is probably to leave prototypes alone!
+
+> Based on this knowledge, we identified a practical JavaScript coding tip that can help boost performance:
+don’t mess with prototypes (or if you really, really need to, then at least do it before other code runs)
+-- Mathias Bynens
+
+The excellent MDN Web Doc also warns us against https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/setPrototypeOf[`setPrototypeOf`].
+====
+
+== Microbenchmarks
+
+So how much of a difference does it make when V8 is not using fast execution paths?
+
+To find out let's run the same code with and without prototypes tampering on Node.js 14.12.0 (which uses V8 version 8.4).
+
+NOTE: In the following examples, I'm using the great https://benchmarkjs.com/[`benchmark`] library.
+
+```js
+const process = require('process')
+const Benchmark = require('benchmark')
+
+if (process.env.PROTOTYPE_TAMPERING) {
+  Object.setPrototypeOf(Array.prototype, {})
+}
+
+const bench = new Benchmark('splice', () => {
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'].splice(0, 1)
+})
+console.log(bench.run().toString())
+```
+
+```
+$ node splice.js
+splice x 17,968,510 ops/sec ±0.70% (91 runs sampled)
+```
+```
+$ PROTOTYPE_TAMPERING=true node splice.js
+splice x 795,132 ops/sec ±0.46% (95 runs sampled)
+```
+
+Well, that's not great... approximately 20x times slower.
+Please note that your results may vary but it will definitely be slower.
+
+== Faster implementation
+
+In summary, we cannot avoid using prototypes tampering and as a result we get bad performance because V8 cannot use fast execution paths. +
+So, what can we do?
+
+While looking for a solution, I stumbled across this commit in the Node.js repository on GitHub: https://github.com/nodejs/node/commit/d3f8db124463e478420d8bba6fa5cf13af7b4ecb
+In this commit, Ben Noordhuis replaced the call to `Array#splice()` with a faster open-coded version:
+
+```js
+// About 1.5x faster than the two-arg version of Array#splice().
+function spliceOne(list, index) {
+  for (var i = index, k = i + 1, n = list.length; k < n; i += 1, k += 1)
+    list[i] = list[k];
+  list.pop();
+}
+```
+
+Let's give it a try:
+
+```js
+const process = require('process')
+const Benchmark = require('benchmark')
+
+if (process.env.PROTOTYPE_TAMPERING) {
+  Object.setPrototypeOf(Array.prototype, {})
+}
+
+function spliceOne(list, index) {
+  for (var i = index, k = i + 1, n = list.length; k < n; i += 1, k += 1)
+    list[i] = list[k];
+  list.pop();
+}
+
+const bench = new Benchmark('spliceOne', () => {
+  spliceOne(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], 0)
+})
+console.log(bench.run().toString())
+```
+
+```
+$ PROTOTYPE_TAMPERING=true node splice-one.js
+spliceOne x 15,719,180 ops/sec ±0.61% (92 runs sampled)
+```
+
+
+The performance are actually pretty good and roughly equivalent to what we had before messing around with prototypes.
+Please note that even if you are not using prototypes tampering, this optimization is still 1.5x to 2x faster:
+
+```
+$ node splice-one.js
+spliceOne x 35,553,964 ops/sec ±0.40% (91 runs sampled)
+```
+
+Before replacing every occurrences in your code I still recommend to measure the impact in your context.
+Also, it's worth noting that `Array.splice` might be faster in future version of V8.
+In short, your mileage might vary.
+
+In the next articles, we will see how to optimize `Array#shift`, `Array#unshift` and `Array#slice`.
