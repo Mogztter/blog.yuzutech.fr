@@ -5,6 +5,8 @@ if (process.env.PROTOTYPE_TAMPERING) {
   Object.setPrototypeOf(Array.prototype, {})
 }
 
+// test compatibility: https://github.com/tc39/test262/blob/e193b449d417c4fb7fc9b6f6b869fd55bca04372/implementation-contributed/v8/mjsunit/array-splice.js
+
 // tag::splice-gen-function[]
 function spliceGen (list, start, deleteCount) {
   if (deleteCount <= 0) {
