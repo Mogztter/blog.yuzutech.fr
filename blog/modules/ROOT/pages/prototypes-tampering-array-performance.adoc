@@ -1,4 +1,4 @@
-= Valiant V8: prototypes tampering and Array#splice performance
+= Valiant V8: prototypes tampering and Array operations performance
 Guillaume Grossetie <ggrossetie@yuzutech.fr>
 :page-revdate: 2020-10-04 19:00
 :page-author: Guillaume Grossetie
@@ -10,7 +10,6 @@ Guillaume Grossetie <ggrossetie@yuzutech.fr>
 :source-highlighter: highlight.js
 
 
-
 - Introduce V8 (short)
 - Introduce prototypes tampering
 - Introduce fast paths (and conditions)
@@ -18,13 +17,46 @@ Guillaume Grossetie <ggrossetie@yuzutech.fr>
 - Faster implementation
 - General implementation
 
-
 V8 is a high-performance JavaScript engine most notably used in Chrome and in Node.js.
+It comes as no surprise that the V8 team is working hard to continously improve the performance and make JavaScript as fast as possible.
 
+A common strategy, used by V8 developers, is to optimize operations based on the elements kinds.
+
+> In fact, while running JavaScript code, V8 keeps track of what kind of elements each array contains.
+> This information allows V8 to optimize any operations on the array specifically for this type of element.
+> For example, when you call `reduce`, `map`, or `forEach` on an array, V8 can optimize those operations based on what kind of elements the array contains.
+
+https://v8.dev/blog/elements-kinds#common-elements-kinds
+
+In other words, V8 can identify "fast arrays" and optimize arrays operations by avoiding unnecessary work.
+
+> During his three-months internship on the V8 team, Hai Dang worked on improving the performance of...
+> We implemented this simple idea using CSA for fast arrays, i.e. arrays with one of the six most common elements kinds.
+
+https://v8.dev/blog/spread-elements
+
+In other words, these optimizations are not always possible 
+
+For instance, if an array is dense or packed (ie. it does not contain holes) and every elements are small integers then 
+
+fast arrays, i.e. arrays with one of the six most common elements kinds.
+
+common elements kinds
+
+V8 developers traditionally wrote optimized builtins in assembly language. By using assembly, the hand-written builtin func
+
+We implemented this simple idea using CSA for fast arrays
+
+to make the code faster 
+
+We implemented this simple idea using CSA for fast arrays, i.e. arrays with one of the six most common elements kinds. The optimization applies for the common real-world scenario where the spread occurs at the start of the array literal, e.g. [...foo]. As shown in the graph below, this new fast path yields roughly a 3× performance improvement for spreading an array of length 100,000, making it about 25% faster than the hand-written clone loop.
+
+////
 > V8 Torque is a language that allows developers contributing to the V8 project to express changes in the VM by focusing on the intent of their changes to the VM, rather than preoccupying themselves with unrelated implementation details.
 The language was designed to be simple enough to make it easy to directly translate the ECMAScript specification into an implementation in V8, but powerful enough to express the low-level V8 optimization tricks in a robust way, like creating fast-paths based on tests for specific object-shapes.
 
 Torque compiler converts these morsels into efficient assembly code using the CodeStubAssembler
+////
 
 https://v8.dev/blog/elements-kinds#debugging
 
