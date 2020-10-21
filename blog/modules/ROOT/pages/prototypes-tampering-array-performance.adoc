@@ -35,9 +35,9 @@ In other words, V8 can identify "fast arrays" and optimize arrays operations by 
 
 https://v8.dev/blog/spread-elements
 
-In other words, these optimizations are not always possible 
+In other words, these optimizations are not always possible
 
-For instance, if an array is dense or packed (ie. it does not contain holes) and every elements are small integers then 
+For instance, if an array is dense or packed (ie. it does not contain holes) and every elements are small integers then
 
 fast arrays, i.e. arrays with one of the six most common elements kinds.
 
@@ -47,7 +47,7 @@ V8 developers traditionally wrote optimized builtins in assembly language. By us
 
 We implemented this simple idea using CSA for fast arrays
 
-to make the code faster 
+to make the code faster
 
 We implemented this simple idea using CSA for fast arrays, i.e. arrays with one of the six most common elements kinds. The optimization applies for the common real-world scenario where the spread occurs at the start of the array literal, e.g. [...foo]. As shown in the graph below, this new fast path yields roughly a 3× performance improvement for spreading an array of length 100,000, making it about 25% faster than the hand-written clone loop.
 
@@ -58,17 +58,37 @@ The language was designed to be simple enough to make it easy to directly transl
 Torque compiler converts these morsels into efficient assembly code using the CodeStubAssembler
 ////
 
-https://v8.dev/blog/elements-kinds#debugging
+While reading the https://v8.dev/blog[V8 blog], I found this article related to arrays: https://v8.dev/blog/spread-elements.
+This article does not explicitly talk about `Array.prototype.splice` but suggests that some work has been done to improve common operations on arrays in V8 version 7.2.
+Interesting...
 
+This article also mentions the https://v8.dev/blog/csa[CodeStubAssembler] component used to write robust and optimized JavaScript features.
 Older versions of V8 called out to this JS-with-extensions code:
 https://github.com/v8/v8/blob/7.0.1/src/js/array.js#L599-L642 - I
 don't speak for the V8 team but I don't believe they're looking to
 return to that approach.
 
+the fast path also applies when the spread elements are
+
+
+> V8 Torque is a language that allows developers contributing to the V8 project to express changes in the VM by focusing on the intent of their changes to the VM, rather than preoccupying themselves with unrelated implementation details.
+The language was designed to be simple enough to make it easy to directly translate the ECMAScript specification into an implementation in V8, but powerful enough to express the low-level V8 optimization tricks in a robust way, like creating fast-paths based on tests for specific object-shapes.
+
+Torque compiler converts these morsels into efficient assembly code using the CodeStubAssembler
+
+https://v8.dev/blog/elements-kinds#debugging
+
+https://v8.dev/blog/csa
+
+
+
 As mentioned in the
 https://v8.dev/docs/torque
 
 == Fast paths
+
+Condition `IsPrototypeInitialArrayPrototype`
+https://github.com/v8/v8/blob/4b9b23521e6fd42373ebbcb20ebe03bf445494f9/src/builtins/base.tq#L1299
 
 Torque implementation
 https://github.com/v8/v8/blob/4b9b23521e6fd42373ebbcb20ebe03bf445494f9/src/builtins/array-splice.tq#L125
